@@ -10,9 +10,11 @@
 // https://musescore.github.io/MuseScore_PluginAPI_Docs/plugins/html/annotated.html
 // https://musescore.github.io/MuseScore_PluginAPI_Docs/plugins/html/namespace_ms.html#a16b11be27a8e9362dd122c4d879e01ae
 // https://doc.qt.io/archives/qt-5.9/qmltypes.html
+// https://static.roland.com/assets/media/pdf/FR-1x_e02_W.pdf
 //=============================================================================
 
 import QtQuick 2.2
+import QtQuick.Controls 1.1
 import MuseScore 3.0
 
 MuseScore {
@@ -20,32 +22,73 @@ MuseScore {
     //=============================================================================
     // Meta info
 
-    version: "0.1"
-    description: "Transform a track into a visual chromatic C-griff Europe button accordion. Locate your right buttons at glance"
+    version: "0.2"
+    description: "Transform a track into a visual chromatic button accordion (6 layouts). Locate your right buttons at glance"
     menuPath: "Plugins.ChromaticButtonAccordionRight"
     requiresScore: true
 
-    pluginType: "dialog"
+    id: mainapp
+    pluginType: "dock"
+    dockArea: "right"
     width: 200
-    height: 450
+    height: 535
+    
+    property var buttons: []
+
 
     //=============================================================================
-    // Core
+    // Main loop
 
     onRun: {
         // Check
         if (typeof curScore === 'undefined')
             Qt.quit();
 
-        // Variables
-        const midi_max = 128;
-        var e, i, midi, voice;
-        midi = Array();
-        for (i=0; i<midi_max ; i++)
-            midi.push(0);
+        // Basic layout
+        var i, x, y, but;
+        for (y=0; y<19; y++) {
+            for (x=0; x<5; x++) {
+                i = 5 * y + x;
+                but = Qt.createQmlObject('import QtQuick 2.2; Rectangle {width:30; height:20; visible:true; border.color:"black"; Text {anchors.centerIn:parent}}', mainArea);
+                but.x = 35 * x + 10;
+                but.y = 25 * (y - 1) + 10 * x + 65;
+                buttons.push(Qt.createQmlObject('import QtQuick 2.2; Text {anchors.centerIn:parent}', but));
+            }
+        }
+        refreshAccordion(qLayout.currentIndex);
+    }
 
-        // Walk-through
-        var cursor = curScore.newCursor();
+
+    //=============================================================================
+    // Computation
+
+    function midi2black(key) {
+        return Array(false, true, false, true, false, false, true, false, true, false, true, false)[key % 12];
+    }
+
+    function midi2key(key) {
+        return Array('C', 'C♯', 'D', 'D♯', 'E', 'F', 'F♯', 'G', 'G♯', 'A', 'A♯', 'B')[key % 12] + (Math.floor(key / 12) - 1);
+    }
+
+    function refreshAccordion(id) {
+        // Types of accordions
+        var accordion_c_europe  = Array(null, null, null, 48, 49, null, 49, 50, 51, 52, 51, 52, 53, 54, 55, 54, 55, 56, 57, 58, 57, 58, 59, 60, 61, 60, 61, 62, 63, 64, 63, 64, 65, 66, 67, 66, 67, 68, 69, 70, 69, 70, 71, 72, 73, 72, 73, 74, 75, 76, 75, 76, 77, 78, 79, 78, 79, 80, 81, 82, 81, 82, 83, 84, 85, 84, 85, 86, 87, 88, 87, 88, 89, 90, 91, 90, 91, 92, 93, 94, 93, 94, 95, 96, 97, 96, 97, 98, 99, null, 99, 100, null, null, null),
+            accordion_c_griff2  = Array(null, null, null, 51, 53, null, 50, 52, 54, 56, 51, 53, 55, 57, 59, 54, 56, 58, 60, 62, 57, 59, 61, 63, 65, 60, 62, 64, 66, 68, 63, 65, 67, 69, 71, 66, 68, 70, 72, 74, 69, 71, 73, 75, 77, 72, 74, 76, 78, 80, 75, 77, 79, 81, 83, 78, 80, 82, 84, 86, 81, 83, 85, 87, 89, 84, 86, 88, 90, 92, 87, 89, 91, 93, 95, 90, 92, 94, 96, 98, 93, 95, 97, 99, 101, 96, 98, 100, 102, null, 99, 101, null, null, null),
+            accordion_b_bajan   = Array(null, null, null, 50, 52, null, 49, 51, 53, 55, 50, 52, 54, 56, 58, 53, 55, 57, 59, 61, 56, 58, 60, 62, 64, 59, 61, 63, 65, 67, 62, 64, 66, 68, 70, 65, 67, 69, 71, 73, 68, 70, 72, 74, 76, 71, 73, 75, 77, 79, 74, 76, 78, 80, 82, 77, 79, 81, 83, 85, 80, 82, 84, 86, 88, 83, 85, 87, 89, 91, 86, 88, 90, 92, 94, 89, 91, 93, 95, 97, 92, 94, 96, 98, 100, 95, 97, 99, 101, null, 98, 100, null, null, null),
+            accordion_b_finland = Array(null, null, null, 49, 50, null, 50, 51, 52, 53, 52, 53, 54, 55, 56, 55, 56, 57, 58, 59, 58, 59, 60, 61, 62, 61, 62, 63, 64, 65, 64, 65, 66, 67, 68, 67, 68, 69, 70, 71, 70, 71, 72, 73, 74, 73, 74, 75, 76, 77, 76, 77, 78, 79, 80, 79, 80, 81, 82, 83, 82, 83, 84, 85, 86, 85, 86, 87, 88, 89, 88, 89, 90, 91, 92, 91, 92, 93, 94, 95, 94, 95, 96, 97, 98, 97, 98, 99, 100, null, 100, 101, null, null, null),
+            accordion_b_griff1  = Array(null, null, null, null, 48, null, 48, 49, 50, 51, 50, 51, 52, 53, 54, 53, 54, 55, 56, 57, 56, 57, 58, 59, 60, 59, 60, 61, 62, 63, 62, 63, 64, 65, 66, 65, 66, 67, 68, 69, 68, 69, 70, 71, 72, 71, 72, 73, 74, 75, 74, 75, 76, 77, 78, 77, 78, 79, 80, 81, 80, 81, 82, 83, 84, 83, 84, 85, 86, 87, 86, 87, 88, 89, 90, 89, 90, 91, 92, 93, 92, 93, 94, 95, 96, 95, 96, 97, 98, null, 98, 99, null, null, null),
+            accordion_b_griff2  = Array(null, null, null, 49, 51, null, 48, 50, 52, 54, 49, 51, 53, 55, 57, 52, 54, 56, 58, 60, 55, 57, 59, 61, 63, 58, 60, 62, 64, 66, 61, 63, 65, 67, 69, 64, 66, 68, 70, 72, 67, 69, 71, 73, 75, 70, 72, 74, 76, 78, 73, 75, 77, 79, 81, 76, 78, 80, 82, 84, 79, 81, 83, 85, 87, 82, 84, 86, 88, 90, 85, 87, 89, 91, 93, 88, 90, 92, 94, 96, 91, 93, 95, 97, 99, 94, 96, 98, 100, null, 97, 99, null, null, null),
+            accordions = Array(accordion_c_europe, accordion_c_griff2, accordion_b_bajan, accordion_b_finland, accordion_b_griff1, accordion_b_griff2);
+
+        var e, i, x, y,
+            but, key, black,
+            midi, cursor, voice;
+
+        // Count the notes
+        midi = Array();
+        for (i=0; i<128 ; i++)
+            midi.push(0);
+        cursor = curScore.newCursor();
         cursor.staffIdx = 0;
         for (voice=0; voice<4; voice++) {
             cursor.voice = voice;
@@ -59,127 +102,82 @@ MuseScore {
             }
         }
 
-        /*// Debug
-        for (i=0; i<midi_max; i++)
-            console.log(i + " = " & midi[i]);
-        //*/
-
-        // Update the buttons
-        function button_mapper(components, lambda) {
-            var i;
-            for (i=0; i<components.length; i++)
-                if (midi[lambda(i)] > 0) {
-                    components[i].text = midi[lambda(i)];
-                    components[i].parent.color = "aqua";
+        // Layout
+        for (x=0; x<5; x++) {
+            for (y=0; y<19; y++) {
+                i = y * 5 + x;
+                but = buttons[i];
+                key = accordions[id][i];
+                black = midi2black(key);
+                if (key == null) {
+                    but.parent.color = 'red';
+                    but.text = '';
+                    but.parent.visible = false;
+                } else {
+                    but.parent.border.width = (key % 12 == 0 ? 3 : 1);
+                    if (midi[key] > 0) {
+                        but.color = 'black';
+                        but.parent.color = (black ? 'deepskyblue' : 'lightskyblue');
+                        but.text = midi[key];
+                        but.font.pointSize = 10;
+                    } else {
+                        but.color = (black ? 'white' : 'black');
+                        but.parent.color = (black ? 'slategray' : 'white');
+                        but.text = (qShowNotes.checked ? midi2key(key) : '');
+                        but.font.pointSize = 7;
+                    }
+                    but.parent.visible = true;
                 }
+            }
         }
-        button_mapper(Array(c3, cd3, d3, dd3, e3, f3, fd3, g3, gd3, a3, ad3, b3,
-                            c4, cd4, d4, dd4, e4, f4, fd4, g4, gd4, a4, ad4, b4,
-                            c5, cd5, d5, dd5, e5, f5, fd5, g5, gd5, a5, ad5, b5,
-                            c6, cd6, d6, dd6, e6, f6, fd6, g6, gd6, a6, ad6, b6,
-                            c7, cd7, d7),
-                      function(i) { return 48 + i; });
-        button_mapper(Array(dd3_4, fd3_4, a3_4,
-                            c4_4, dd4_4, fd4_4, a4_4,
-                            c5_4, dd5_4, fd5_4, a5_4,
-                            c6_4, dd6_4, fd6_4, a6_4,
-                            c7_4, dd7_4),
-                      function(i) { return 51 + 3*i; });
-        button_mapper(Array(cd3_5, e3_5, g3_5, ad3_5,
-                            cd4_5, e4_5, g4_5, ad4_5,
-                            cd5_5, e5_5, g5_5, ad5_5,
-                            cd6_5, e6_5, g6_5, ad6_5,
-                            cd7_5, e7_5),
-                      function(i) { return 49 + 3*i; });
     }
 
-    //=============================================================================
-    // Static UI
 
-	Rectangle {color:"gray";  width:30; height:20; x:150; y: 15; visible:true;  border.color:"black"; border.width:1; Text {id:"cd3_5"; anchors.centerIn:parent}}
-	Rectangle {color:"white"; width:30; height:20; x: 10; y:  0; visible:false; border.color:"black"; border.width:3; Text {id:"c3"; anchors.centerIn:parent}}
-	Rectangle {color:"gray";  width:30; height:20; x: 45; y: 10; visible:true;  border.color:"black"; border.width:1; Text {id:"cd3"; anchors.centerIn:parent}}
-	Rectangle {color:"white"; width:30; height:20; x: 80; y: 20; visible:true;  border.color:"black"; border.width:1; Text {id:"d3"; anchors.centerIn:parent}}
-	Rectangle {color:"gray";  width:30; height:20; x:115; y: 30; visible:true;  border.color:"black"; border.width:1; Text {id:"dd3_4"; anchors.centerIn:parent}}
-	Rectangle {color:"white"; width:30; height:20; x:150; y: 40; visible:true;  border.color:"black"; border.width:1; Text {id:"e3_5"; anchors.centerIn:parent}}
-	Rectangle {color:"gray";  width:30; height:20; x: 10; y: 25; visible:true;  border.color:"black"; border.width:1; Text {id:"dd3"; anchors.centerIn:parent}}
-	Rectangle {color:"white"; width:30; height:20; x: 45; y: 35; visible:true;  border.color:"black"; border.width:1; Text {id:"e3"; anchors.centerIn:parent}}
-	Rectangle {color:"white"; width:30; height:20; x: 80; y: 45; visible:true;  border.color:"black"; border.width:1; Text {id:"f3"; anchors.centerIn:parent}}
-	Rectangle {color:"gray";  width:30; height:20; x:115; y: 55; visible:true;  border.color:"black"; border.width:1; Text {id:"fd3_4"; anchors.centerIn:parent}}
-	Rectangle {color:"white"; width:30; height:20; x:150; y: 65; visible:true;  border.color:"black"; border.width:1; Text {id:"g3_5"; anchors.centerIn:parent}}
-	Rectangle {color:"gray";  width:30; height:20; x: 10; y: 50; visible:true;  border.color:"black"; border.width:1; Text {id:"fd3"; anchors.centerIn:parent}}
-	Rectangle {color:"white"; width:30; height:20; x: 45; y: 60; visible:true;  border.color:"black"; border.width:1; Text {id:"g3"; anchors.centerIn:parent}}
-	Rectangle {color:"gray";  width:30; height:20; x: 80; y: 70; visible:true;  border.color:"black"; border.width:1; Text {id:"gd3"; anchors.centerIn:parent}}
-	Rectangle {color:"white"; width:30; height:20; x:115; y: 80; visible:true;  border.color:"black"; border.width:1; Text {id:"a3_4"; anchors.centerIn:parent}}
-	Rectangle {color:"gray";  width:30; height:20; x:150; y: 90; visible:true;  border.color:"black"; border.width:1; Text {id:"ad3_5"; anchors.centerIn:parent}}
-	Rectangle {color:"white"; width:30; height:20; x: 10; y: 75; visible:true;  border.color:"black"; border.width:1; Text {id:"a3"; anchors.centerIn:parent}}
-	Rectangle {color:"gray";  width:30; height:20; x: 45; y: 85; visible:true;  border.color:"black"; border.width:1; Text {id:"ad3"; anchors.centerIn:parent}}
-	Rectangle {color:"white"; width:30; height:20; x: 80; y: 95; visible:true;  border.color:"black"; border.width:1; Text {id:"b3"; anchors.centerIn:parent}}
-	Rectangle {color:"white"; width:30; height:20; x:115; y:105; visible:true;  border.color:"black"; border.width:3; Text {id:"c4_4"; anchors.centerIn:parent}}
-	Rectangle {color:"gray";  width:30; height:20; x:150; y:115; visible:true;  border.color:"black"; border.width:1; Text {id:"cd4_5"; anchors.centerIn:parent}}
-	Rectangle {color:"white"; width:30; height:20; x: 10; y:100; visible:true;  border.color:"black"; border.width:3; Text {id:"c4"; anchors.centerIn:parent}}
-	Rectangle {color:"gray";  width:30; height:20; x: 45; y:110; visible:true;  border.color:"black"; border.width:1; Text {id:"cd4"; anchors.centerIn:parent}}
-	Rectangle {color:"white"; width:30; height:20; x: 80; y:120; visible:true;  border.color:"black"; border.width:1; Text {id:"d4"; anchors.centerIn:parent}}
-	Rectangle {color:"gray";  width:30; height:20; x:115; y:130; visible:true;  border.color:"black"; border.width:1; Text {id:"dd4_4"; anchors.centerIn:parent}}
-	Rectangle {color:"white"; width:30; height:20; x:150; y:140; visible:true;  border.color:"black"; border.width:1; Text {id:"e4_5"; anchors.centerIn:parent}}
-	Rectangle {color:"gray";  width:30; height:20; x: 10; y:125; visible:true;  border.color:"black"; border.width:1; Text {id:"dd4"; anchors.centerIn:parent}}
-	Rectangle {color:"white"; width:30; height:20; x: 45; y:135; visible:true;  border.color:"black"; border.width:1; Text {id:"e4"; anchors.centerIn:parent}}
-	Rectangle {color:"white"; width:30; height:20; x: 80; y:145; visible:true;  border.color:"black"; border.width:1; Text {id:"f4"; anchors.centerIn:parent}}
-	Rectangle {color:"gray";  width:30; height:20; x:115; y:155; visible:true;  border.color:"black"; border.width:1; Text {id:"fd4_4"; anchors.centerIn:parent}}
-	Rectangle {color:"white"; width:30; height:20; x:150; y:165; visible:true;  border.color:"black"; border.width:1; Text {id:"g4_5"; anchors.centerIn:parent}}
-	Rectangle {color:"gray";  width:30; height:20; x: 10; y:150; visible:true;  border.color:"black"; border.width:1; Text {id:"fd4"; anchors.centerIn:parent}}
-	Rectangle {color:"white"; width:30; height:20; x: 45; y:160; visible:true;  border.color:"black"; border.width:1; Text {id:"g4"; anchors.centerIn:parent}}
-	Rectangle {color:"gray";  width:30; height:20; x: 80; y:170; visible:true;  border.color:"black"; border.width:1; Text {id:"gd4"; anchors.centerIn:parent}}
-	Rectangle {color:"white"; width:30; height:20; x:115; y:180; visible:true;  border.color:"black"; border.width:1; Text {id:"a4_4"; anchors.centerIn:parent}}
-	Rectangle {color:"gray";  width:30; height:20; x:150; y:190; visible:true;  border.color:"black"; border.width:1; Text {id:"ad4_5"; anchors.centerIn:parent}}
-	Rectangle {color:"white"; width:30; height:20; x: 10; y:175; visible:true;  border.color:"black"; border.width:1; Text {id:"a4"; anchors.centerIn:parent}}
-	Rectangle {color:"gray";  width:30; height:20; x: 45; y:185; visible:true;  border.color:"black"; border.width:1; Text {id:"ad4"; anchors.centerIn:parent}}
-	Rectangle {color:"white"; width:30; height:20; x: 80; y:195; visible:true;  border.color:"black"; border.width:1; Text {id:"b4"; anchors.centerIn:parent}}
-	Rectangle {color:"white"; width:30; height:20; x:115; y:205; visible:true;  border.color:"black"; border.width:3; Text {id:"c5_4"; anchors.centerIn:parent}}
-	Rectangle {color:"gray";  width:30; height:20; x:150; y:215; visible:true;  border.color:"black"; border.width:1; Text {id:"cd5_5"; anchors.centerIn:parent}}
-	Rectangle {color:"white"; width:30; height:20; x: 10; y:200; visible:true;  border.color:"black"; border.width:3; Text {id:"c5"; anchors.centerIn:parent}}
-	Rectangle {color:"gray";  width:30; height:20; x: 45; y:210; visible:true;  border.color:"black"; border.width:1; Text {id:"cd5"; anchors.centerIn:parent}}
-	Rectangle {color:"white"; width:30; height:20; x: 80; y:220; visible:true;  border.color:"black"; border.width:1; Text {id:"d5"; anchors.centerIn:parent}}
-	Rectangle {color:"gray";  width:30; height:20; x:115; y:230; visible:true;  border.color:"black"; border.width:1; Text {id:"dd5_4"; anchors.centerIn:parent}}
-	Rectangle {color:"white"; width:30; height:20; x:150; y:240; visible:true;  border.color:"black"; border.width:1; Text {id:"e5_5"; anchors.centerIn:parent}}
-	Rectangle {color:"gray";  width:30; height:20; x: 10; y:225; visible:true;  border.color:"black"; border.width:1; Text {id:"dd5"; anchors.centerIn:parent}}
-	Rectangle {color:"white"; width:30; height:20; x: 45; y:235; visible:true;  border.color:"black"; border.width:1; Text {id:"e5"; anchors.centerIn:parent}}
-	Rectangle {color:"white"; width:30; height:20; x: 80; y:245; visible:true;  border.color:"black"; border.width:1; Text {id:"f5"; anchors.centerIn:parent}}
-	Rectangle {color:"gray";  width:30; height:20; x:115; y:255; visible:true;  border.color:"black"; border.width:1; Text {id:"fd5_4"; anchors.centerIn:parent}}
-	Rectangle {color:"white"; width:30; height:20; x:150; y:265; visible:true;  border.color:"black"; border.width:1; Text {id:"g5_5"; anchors.centerIn:parent}}
-	Rectangle {color:"gray";  width:30; height:20; x: 10; y:250; visible:true;  border.color:"black"; border.width:1; Text {id:"fd5"; anchors.centerIn:parent}}
-	Rectangle {color:"white"; width:30; height:20; x: 45; y:260; visible:true;  border.color:"black"; border.width:1; Text {id:"g5"; anchors.centerIn:parent}}
-	Rectangle {color:"gray";  width:30; height:20; x: 80; y:270; visible:true;  border.color:"black"; border.width:1; Text {id:"gd5"; anchors.centerIn:parent}}
-	Rectangle {color:"white"; width:30; height:20; x:115; y:280; visible:true;  border.color:"black"; border.width:1; Text {id:"a5_4"; anchors.centerIn:parent}}
-	Rectangle {color:"gray";  width:30; height:20; x:150; y:290; visible:true;  border.color:"black"; border.width:1; Text {id:"ad5_5"; anchors.centerIn:parent}}
-	Rectangle {color:"white"; width:30; height:20; x: 10; y:275; visible:true;  border.color:"black"; border.width:1; Text {id:"a5"; anchors.centerIn:parent}}
-	Rectangle {color:"gray";  width:30; height:20; x: 45; y:285; visible:true;  border.color:"black"; border.width:1; Text {id:"ad5"; anchors.centerIn:parent}}
-	Rectangle {color:"white"; width:30; height:20; x: 80; y:295; visible:true;  border.color:"black"; border.width:1; Text {id:"b5"; anchors.centerIn:parent}}
-	Rectangle {color:"white"; width:30; height:20; x:115; y:305; visible:true;  border.color:"black"; border.width:3; Text {id:"c6_4"; anchors.centerIn:parent}}
-	Rectangle {color:"gray";  width:30; height:20; x:150; y:315; visible:true;  border.color:"black"; border.width:1; Text {id:"cd6_5"; anchors.centerIn:parent}}
-	Rectangle {color:"white"; width:30; height:20; x: 10; y:300; visible:true;  border.color:"black"; border.width:3; Text {id:"c6"; anchors.centerIn:parent}}
-	Rectangle {color:"gray";  width:30; height:20; x: 45; y:310; visible:true;  border.color:"black"; border.width:1; Text {id:"cd6"; anchors.centerIn:parent}}
-	Rectangle {color:"white"; width:30; height:20; x: 80; y:320; visible:true;  border.color:"black"; border.width:1; Text {id:"d6"; anchors.centerIn:parent}}
-	Rectangle {color:"gray";  width:30; height:20; x:115; y:330; visible:true;  border.color:"black"; border.width:1; Text {id:"dd6_4"; anchors.centerIn:parent}}
-	Rectangle {color:"white"; width:30; height:20; x:150; y:340; visible:true;  border.color:"black"; border.width:1; Text {id:"e6_5"; anchors.centerIn:parent}}
-	Rectangle {color:"gray";  width:30; height:20; x: 10; y:325; visible:true;  border.color:"black"; border.width:1; Text {id:"dd6"; anchors.centerIn:parent}}
-	Rectangle {color:"white"; width:30; height:20; x: 45; y:335; visible:true;  border.color:"black"; border.width:1; Text {id:"e6"; anchors.centerIn:parent}}
-	Rectangle {color:"white"; width:30; height:20; x: 80; y:345; visible:true;  border.color:"black"; border.width:1; Text {id:"f6"; anchors.centerIn:parent}}
-	Rectangle {color:"gray";  width:30; height:20; x:115; y:355; visible:true;  border.color:"black"; border.width:1; Text {id:"fd6_4"; anchors.centerIn:parent}}
-	Rectangle {color:"white"; width:30; height:20; x:150; y:365; visible:true;  border.color:"black"; border.width:1; Text {id:"g6_5"; anchors.centerIn:parent}}
-	Rectangle {color:"gray";  width:30; height:20; x: 10; y:350; visible:true;  border.color:"black"; border.width:1; Text {id:"fd6"; anchors.centerIn:parent}}
-	Rectangle {color:"white"; width:30; height:20; x: 45; y:360; visible:true;  border.color:"black"; border.width:1; Text {id:"g6"; anchors.centerIn:parent}}
-	Rectangle {color:"gray";  width:30; height:20; x: 80; y:370; visible:true;  border.color:"black"; border.width:1; Text {id:"gd6"; anchors.centerIn:parent}}
-	Rectangle {color:"white"; width:30; height:20; x:115; y:380; visible:true;  border.color:"black"; border.width:1; Text {id:"a6_4"; anchors.centerIn:parent}}
-	Rectangle {color:"gray";  width:30; height:20; x:150; y:390; visible:true;  border.color:"black"; border.width:1; Text {id:"ad6_5"; anchors.centerIn:parent}}
-	Rectangle {color:"white"; width:30; height:20; x: 10; y:375; visible:true;  border.color:"black"; border.width:1; Text {id:"a6"; anchors.centerIn:parent}}
-	Rectangle {color:"gray";  width:30; height:20; x: 45; y:385; visible:true;  border.color:"black"; border.width:1; Text {id:"ad6"; anchors.centerIn:parent}}
-	Rectangle {color:"white"; width:30; height:20; x: 80; y:395; visible:true;  border.color:"black"; border.width:1; Text {id:"b6"; anchors.centerIn:parent}}
-	Rectangle {color:"white"; width:30; height:20; x:115; y:405; visible:true;  border.color:"black"; border.width:3; Text {id:"c7_4"; anchors.centerIn:parent}}
-	Rectangle {color:"gray";  width:30; height:20; x:150; y:415; visible:false; border.color:"black"; border.width:1; Text {id:"cd7_5"; anchors.centerIn:parent}}
-	Rectangle {color:"white"; width:30; height:20; x: 10; y:400; visible:true;  border.color:"black"; border.width:3; Text {id:"c7"; anchors.centerIn:parent}}
-	Rectangle {color:"gray";  width:30; height:20; x: 45; y:410; visible:true;  border.color:"black"; border.width:1; Text {id:"cd7"; anchors.centerIn:parent}}
-	Rectangle {color:"white"; width:30; height:20; x: 80; y:420; visible:false; border.color:"black"; border.width:1; Text {id:"d7"; anchors.centerIn:parent}}
-	Rectangle {color:"gray";  width:30; height:20; x:115; y:430; visible:false; border.color:"black"; border.width:1; Text {id:"dd7_4"; anchors.centerIn:parent}}
-	Rectangle {color:"white"; width:30; height:20; x:150; y:440; visible:false; border.color:"black"; border.width:1; Text {id:"e7_5"; anchors.centerIn:parent}}
+    //=============================================================================
+    // QT elements
+
+    Rectangle {
+        id: mainArea
+
+        Label {
+            x: 10
+            y: 15
+            text: "Layout:"
+            font.bold: true
+        }
+        
+        ComboBox {
+            id: qLayout
+            x: 60
+            y: 10
+            width: 120
+            
+            model: ListModel {
+                id: model
+                ListElement { text: "C-griff Europe" }
+                ListElement { text: "C-griff 2" }
+                ListElement { text: "B-griff Bajan" }
+                ListElement { text: "B-griff Finland" }
+                ListElement { text: "D-griff 1" }
+                ListElement { text: "D-griff 2" }
+            }
+            onActivated: refreshAccordion(index)
+        }
+
+        CheckBox {
+            id: qShowNotes
+            x: 10
+            y: 40
+            checked: true
+            text: "Show the keys"
+            onClicked: refreshAccordion(qLayout.currentIndex)
+        }
+
+        Timer {
+            interval: 5000
+            running: true
+            repeat: true
+            onTriggered: refreshAccordion(qLayout.currentIndex)
+        }
+    }
 }
