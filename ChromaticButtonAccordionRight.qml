@@ -6,6 +6,7 @@
 //=============================================================================
 // https://musescore.org/en/handbook/developers-handbook/plugins-3x
 // https://musescore.org/en/developers-handbook/references/musescore-internal-score-representation
+// https://musescore.github.io/MuseScore_PluginAPI_Docs/plugins/html/index.html
 // https://musescore.github.io/MuseScore_PluginAPI_Docs/plugins/html/class_ms_1_1_plugin_a_p_i_1_1_plugin_a_p_i.html
 // https://musescore.github.io/MuseScore_PluginAPI_Docs/plugins/html/annotated.html
 // https://musescore.github.io/MuseScore_PluginAPI_Docs/plugins/html/namespace_ms.html#a16b11be27a8e9362dd122c4d879e01ae
@@ -45,10 +46,9 @@ MuseScore {
             Qt.quit();
 
         // Basic layout
-        var i, x, y, but;
+        var x, y, but;
         for (y=0; y<19; y++) {
             for (x=0; x<5; x++) {
-                i = 5 * y + x;
                 but = Qt.createQmlObject('import QtQuick 2.2; Rectangle {width:30; height:20; visible:true; border.color:"black"; Text {anchors.centerIn:parent}}', mainArea);
                 but.x = 35 * x + 10;
                 but.y = 25 * (y - 1) + 10 * x + 65;
@@ -63,7 +63,7 @@ MuseScore {
     // Computation
 
     function midi2black(key) {
-        return Array(false, true, false, true, false, false, true, false, true, false, true, false)[key % 12];
+        return Array(false, true, false, true, false, false, true, false, true, false, true, false)[(key||0) % 12];
     }
 
     function midi2key(key) {
@@ -88,17 +88,19 @@ MuseScore {
         midi = Array();
         for (i=0; i<128 ; i++)
             midi.push(0);
-        cursor = curScore.newCursor();
-        cursor.staffIdx = 0;
-        for (voice=0; voice<4; voice++) {
-            cursor.voice = voice;
-            cursor.rewind(Cursor.SCORE_START);
-            while (cursor.segment) {
-                if (e = cursor.element)
-                    if (e.type == Element.CHORD)
-                        for (i=0; i<e.notes.length; i++)
-                            midi[e.notes[i].pitch]++;
-                cursor.next();
+        if (curScore != null) {
+            cursor = curScore.newCursor();
+            cursor.staffIdx = 0;
+            for (voice=0; voice<4; voice++) {
+                cursor.voice = voice;
+                cursor.rewind(Cursor.SCORE_START);
+                while (cursor.segment) {
+                    if (e = cursor.element)
+                        if (e.type == Element.CHORD)
+                            for (i=0; i<e.notes.length; i++)
+                                midi[e.notes[i].pitch]++;
+                    cursor.next();
+                }
             }
         }
 
@@ -108,12 +110,12 @@ MuseScore {
                 i = y * 5 + x;
                 but = buttons[i];
                 key = accordions[id][i];
-                black = midi2black(key);
                 if (key == null) {
                     but.parent.color = 'red';
                     but.text = '';
                     but.parent.visible = false;
                 } else {
+                    black = midi2black(key);
                     but.parent.border.width = (key % 12 == 0 ? 3 : 1);
                     if (midi[key] > 0) {
                         but.color = 'black';
@@ -140,6 +142,7 @@ MuseScore {
         id: mainArea
 
         Label {
+            id: qLayoutLabel
             x: 10
             y: 15
             text: "Layout:"
@@ -174,6 +177,7 @@ MuseScore {
         }
 
         Timer {
+            id: qTimer
             interval: 5000
             running: true
             repeat: true
