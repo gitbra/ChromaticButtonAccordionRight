@@ -23,7 +23,7 @@ MuseScore {
     //=============================================================================
     // Meta info
 
-    version: "0.2.1"
+    version: "0.2.2"
     description: "Transform a track into a visual chromatic button accordion (6 layouts). Locate your right buttons at glance"
     menuPath: "Plugins.ChromaticButtonAccordionRight"
     requiresScore: true
@@ -33,12 +33,21 @@ MuseScore {
     dockArea: "right"
     width: 200
     height: 535
-    
+
+    property var rotate: false
+    property var button_width: 30
+    property var button_height: 20
+    property var button_spacing: 5
     property var buttons: []
 
 
     //=============================================================================
-    // Main loop
+    // User interface
+
+    function getButtonPosition(x, y) {
+        return {x: (button_width + button_spacing) * x + (2 * button_spacing),
+                y: (button_height + button_spacing) * (y - 1) + (2 * button_spacing) * x + 90};
+    }
 
     onRun: {
         // Check
@@ -46,12 +55,18 @@ MuseScore {
             Qt.quit();
 
         // Basic layout
-        var x, y, but;
+        var x, y, pos, but, pivot;
+        pivot = getButtonPosition(2, 9);
         for (y=0; y<19; y++) {
             for (x=0; x<5; x++) {
-                but = Qt.createQmlObject('import QtQuick 2.2; Rectangle {width:30; height:20; visible:true; border.color:"black"; Text {anchors.centerIn:parent}}', mainArea);
-                but.x = 35 * x + 10;
-                but.y = 25 * (y - 1) + 10 * x + 90;
+                but = Qt.createQmlObject('import QtQuick 2.2; Rectangle {width:'+button_width+'; height:'+button_height+'; visible:true; border.color:"black"; Text {anchors.centerIn:parent}}', mainArea);
+                pos = getButtonPosition(x, y);
+                if (rotate) {
+                    pos.x += 2 * (pivot.x - pos.x);
+                    pos.y += 2 * (pivot.y - pos.y);
+                }
+                but.x = pos.x;
+                but.y = pos.y;
                 buttons.push(Qt.createQmlObject('import QtQuick 2.2; Text {anchors.centerIn:parent}', but));
             }
         }
@@ -77,7 +92,7 @@ MuseScore {
             scales = Array(scale_major, scale_minor),
             scales_txt = Array('', 'm'),
             // Keys
-			keys_black = Array(false, true, false, true, false, false, true, false, true, false, true, false),
+            keys_black = Array(false, true, false, true, false, false, true, false, true, false, true, false),
             keys_txt = Array('C', 'C♯', 'D', 'D♯', 'E', 'F', 'F♯', 'G', 'G♯', 'A', 'A♯', 'B');
 
         var e, i, x, y,
