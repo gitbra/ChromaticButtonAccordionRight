@@ -7,9 +7,10 @@
 // https://musescore.org/en/handbook/developers-handbook/plugins-3x
 // https://musescore.org/en/developers-handbook/references/musescore-internal-score-representation
 // https://musescore.github.io/MuseScore_PluginAPI_Docs/plugins/html/index.html
-// https://musescore.github.io/MuseScore_PluginAPI_Docs/plugins/html/class_ms_1_1_plugin_a_p_i_1_1_plugin_a_p_i.html
 // https://musescore.github.io/MuseScore_PluginAPI_Docs/plugins/html/annotated.html
 // https://musescore.github.io/MuseScore_PluginAPI_Docs/plugins/html/namespace_ms.html#a16b11be27a8e9362dd122c4d879e01ae
+// https://musescore.github.io/MuseScore_PluginAPI_Docs/plugins/html/class_ms_1_1_plugin_a_p_i_1_1_element.html
+// https://musescore.github.io/MuseScore_PluginAPI_Docs/plugins/html/class_ms_1_1_plugin_a_p_i_1_1_plugin_a_p_i.html
 // https://doc.qt.io/archives/qt-5.9/qmltypes.html
 // https://static.roland.com/assets/media/pdf/FR-1x_e02_W.pdf
 //=============================================================================
@@ -31,22 +32,24 @@ MuseScore {
     id: mainapp
     pluginType: "dock"
     dockArea: "right"
-    width: 200
-    height: 535
+    width: 260
+    height: 630
 
-    property var rotate: false
+    property var rotate: false                // Manual set only
     property var button_width: 30
     property var button_height: 20
     property var button_spacing: 5
     property var buttons: []
+
+    property var c_keys_txt: Array('C', 'C♯', 'D', 'D♯', 'E', 'F', 'F♯', 'G', 'G♯', 'A', 'A♯', 'B')
 
 
     //=============================================================================
     // User interface
 
     function getButtonPosition(x, y) {
-        return {x: (button_width + button_spacing) * x + (2 * button_spacing),
-                y: (button_height + button_spacing) * (y - 1) + (2 * button_spacing) * x + 90};
+        return {x: (button_width + button_spacing) * x + (2 * button_spacing) + 10,
+                y: (button_height + button_spacing) * (y - 1) + (2 * button_spacing) * x + 95};
     }
 
     onRun: {
@@ -77,6 +80,10 @@ MuseScore {
     //=============================================================================
     // Computation
 
+    function key2us(key) {
+        return c_keys_txt[key % 12] + (Math.floor(key / 12) - 1);
+    }
+
     function refreshAccordion(id) {
         var // Types of accordions
             accordion_c_europe  = Array(null, null, null, 48, 49, null, 49, 50, 51, 52, 51, 52, 53, 54, 55, 54, 55, 56, 57, 58, 57, 58, 59, 60, 61, 60, 61, 62, 63, 64, 63, 64, 65, 66, 67, 66, 67, 68, 69, 70, 69, 70, 71, 72, 73, 72, 73, 74, 75, 76, 75, 76, 77, 78, 79, 78, 79, 80, 81, 82, 81, 82, 83, 84, 85, 84, 85, 86, 87, 88, 87, 88, 89, 90, 91, 90, 91, 92, 93, 94, 93, 94, 95, 96, 97, 96, 97, 98, 99, null, 99, 100, null, null, null),
@@ -92,8 +99,7 @@ MuseScore {
             scales = Array(scale_major, scale_minor),
             scales_txt = Array('', 'm'),
             // Keys
-            keys_black = Array(false, true, false, true, false, false, true, false, true, false, true, false),
-            keys_txt = Array('C', 'C♯', 'D', 'D♯', 'E', 'F', 'F♯', 'G', 'G♯', 'A', 'A♯', 'B');
+            keys_black = Array(false, true, false, true, false, false, true, false, true, false, true, false);
 
         var e, i, x, y,
             but, key, black,
@@ -144,7 +150,7 @@ MuseScore {
                     } else {
                         but.color = (black ? 'white' : 'black');
                         but.parent.color = (black ? 'slategray' : 'white');
-                        but.text = (qShowNotes.checked ? keys_txt[key % 12] + (Math.floor(key / 12) - 1) : '');
+                        but.text = (qShowNotes.checked ? key2us(key) : '');
                         but.font.pointSize = 7;
                     }
                     but.parent.visible = true;
@@ -164,7 +170,7 @@ MuseScore {
                     sum_r = Array();
                 if ((sum > 0) && (sum >= sum_max)) {
                     sum_max = sum;
-                    sum_r.push(keys_txt[x] + scales_txt[y]);
+                    sum_r.push(c_keys_txt[x] + scales_txt[y]);
                 }
             }
         }
@@ -172,7 +178,87 @@ MuseScore {
             sum_r.push('-');
         else
             sum_r.sort();
-        qScaleLabel.text = 'Possible scale: ' + sum_r.join(', ');
+        qScaleLabel.text = sum_r.join(', ');
+
+        // Other determinations
+        refreshFingering();
+    }
+
+    function refreshFingering() {
+        var cursor, e, e2, i, n, f, p,
+            keys, fingers, errmsg,
+            hand;
+
+        // Map the keys and fingers
+        keys = Array();
+        fingers = Array();
+        errmsg = '';
+        if (curScore != null) {
+            cursor = curScore.newCursor();
+            cursor.staffIdx = 0;
+            cursor.voice = 0;
+            cursor.rewind(Cursor.SCORE_START);
+            while (cursor.segment) {
+                if (e = cursor.element) {
+                    if (e.type == Element.CHORD) {
+                        // Key
+                        if (e.notes.length != 1) {
+                            errmsg = 'chords are not supported';
+                            break;
+                        }
+                        e2 = e.notes[0];
+                        keys.push(e2.pitch);
+
+                        // Finger
+                        n = 0;
+                        for (i=0; i<e2.elements.length; i++) {
+                            if (e2.elements[i].type == Element.FINGERING) {
+                                f = parseInt(e2.elements[i].text.substring(0, 1));
+                                if (isNaN(f) || (f < 1) || (f > 5))
+                                    errmsg = 'wrong finger identifier';
+                                else
+                                    n++;
+                            }
+                        }
+                        if (n == 0)
+                            fingers.push(0);
+                        else if (n == 1)
+                            fingers.push(f);
+                        else
+                            errmsg = 'multiple fingering for a key';
+                    }
+                }
+                if (errmsg.length > 0)
+                    break;
+                cursor.next();
+            }
+        }
+
+        // Detect the inconsistencies
+        if ((errmsg.length == 0) && (keys.length > 0) && (keys.length == fingers.length)) {
+            hand = Array(-1, -1, -1, -1, -1, -1);
+            for (i=0; i<keys.length; i++) {
+                p = hand.indexOf(keys[i]);
+                if (fingers[i] != 0) {                                                  // With finger mark
+                    if (!qFingeringRedundantCheckbox.checked && (p != -1) && (p == fingers[i])) {
+                        errmsg = 'redundant finger for '+key2us(keys[i])+' (note #'+(i+1)+')';
+                        break;
+                    }
+                    hand.forEach(function(e) { return e == keys[i] ? -1 : e });         // Release key
+                    hand[fingers[i]] = keys[i];                                         // Press key
+                } else {                                                                // Without finger mark
+                    if (p == -1) {
+                        errmsg = 'missing finger for '+key2us(keys[i])+' (note #'+(i+1)+')';
+                        break;
+                    }
+                }
+            }
+        }
+
+        // Final analysis
+        if (errmsg == '')
+            errmsg = 'no error found';
+        qFingeringLabel.text = errmsg;
     }
 
 
@@ -189,13 +275,13 @@ MuseScore {
             text: "Layout:"
             font.bold: true
         }
-        
+
         ComboBox {
             id: qLayout
             x: 60
             y: 10
             width: 120
-            
+
             model: ListModel {
                 id: model
                 ListElement { text: "C-griff Europe" }
@@ -218,9 +304,36 @@ MuseScore {
         }
 
         Label {
-            id: qScaleLabel
             x: 10
             y: 70
+            text: "Possible scales:"
+            font.bold: true
+        }
+
+        Label {
+            id: qScaleLabel
+            x: 100
+            y: 70
+        }
+
+        Label {
+            x: 10
+            y: 560
+            text: "Fingering:"
+            font.bold: true
+        }
+
+        Label {
+            id: qFingeringLabel
+            x: 70
+            y: 560
+        }
+
+        CheckBox {
+            id: qFingeringRedundantCheckbox
+            x: 10
+            y: 580
+            text: "Allowed redundancies"
         }
 
         Timer {

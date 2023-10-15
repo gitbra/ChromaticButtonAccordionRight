@@ -2,7 +2,7 @@
 
 *(Tested in MuseScore 3.6.2)*
 
-I am learning the chromatic button accordion. I use MuseScore a lot to prepare my music. I wanted an assistant to see at glance which buttons the right hand should press for a track.
+I am learning the chromatic button accordion and use MuseScore a lot to prepare my music. I needed an assistant to see at glance which buttons the right hand should press for a track, and to check the fingering in the annotations.
 
 For what it's worth, here is the plugin for doing that! Enjoy.
 
@@ -27,6 +27,7 @@ The accordion refreshes itself every 5 seconds.
 
 - Not tested under MuseScore 4
 - First track only
+- First voice only for the fingering
 - Selections are ignored
 - 8va/8vb are unsupported
 - Grace notes are unsupported
