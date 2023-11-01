@@ -2,7 +2,11 @@
 
 *(Tested in MuseScore 3.6.2)*
 
-I am learning the chromatic button accordion and use MuseScore a lot to prepare my music. I needed an assistant to see at glance which buttons the right hand should press for a track, and to check the fingering in the annotations.
+I am learning the chromatic button accordion and use MuseScore a lot to prepare my music. I needed an assistant to:
+
+- see at glance which buttons the right hand should press for a track,
+- check the fingering in the annotations,
+- find some suitable chords within a defined scale.
 
 For what it's worth, here is the plugin for doing that! Enjoy.
 
@@ -20,7 +24,7 @@ Put the QML file into the folder `C:\GoToFolderOf\MuseScore\plugins\`, then run 
 
 ![](screenshot.png)
 
-The accordion refreshes itself every 5 seconds.
+The accordion refreshes itself every 3 seconds.
 
 
 ## Known limitations
@@ -29,6 +33,8 @@ The accordion refreshes itself every 5 seconds.
 - First track only
 - First voice only for the fingering
 - Selections are ignored
-- 8va/8vb are unsupported
-- Grace notes are unsupported
+- 8va/8vb are not supported
+- Grace notes are not supported
 - Long notes are several notes
+- Chords are not supported for the check of the fingering
+- Multiple key signatures are not supported for the suggestion of chords

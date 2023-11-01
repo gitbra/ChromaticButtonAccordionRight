@@ -24,8 +24,8 @@ MuseScore {
     //=============================================================================
     // Meta info
 
-    version: "0.2.2"
-    description: "Transform a track into a visual chromatic button accordion (6 layouts). Locate your right buttons at glance"
+    version: "0.2.3"
+    description: "Musical tool for your chromatic button accordion: 6 layouts, fingering and chords"
     menuPath: "Plugins.ChromaticButtonAccordionRight"
     requiresScore: true
 
@@ -33,7 +33,7 @@ MuseScore {
     pluginType: "dock"
     dockArea: "right"
     width: 260
-    height: 630
+    height: 750
 
     property var rotate: false                // Manual set only
     property var button_width: 30
@@ -42,6 +42,7 @@ MuseScore {
     property var buttons: []
 
     property var c_keys_txt: Array('C', 'C♯', 'D', 'D♯', 'E', 'F', 'F♯', 'G', 'G♯', 'A', 'A♯', 'B')
+    property var c_flatkeys_txt: Array('C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B')  // "♭" takes more space than "b"
 
 
     //=============================================================================
@@ -104,13 +105,15 @@ MuseScore {
         var e, i, x, y,
             but, key, black,
             midi, midi_oct, cursor, voice,
-            sum, sum_max, sum_r;
+            sum, sum_max, sum_r,
+            selkeys;
 
         // Count the notes
         midi = Array();
         for (i=0; i<128; i++)
             midi.push(0);
         midi_oct = Array(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+        selkeys = Array();
         if (curScore != null) {
             cursor = curScore.newCursor();
             cursor.staffIdx = 0;
@@ -123,6 +126,8 @@ MuseScore {
                             for (i=0; i<e.notes.length; i++) {
                                 midi[e.notes[i].pitch]++;
                                 midi_oct[e.notes[i].pitch % 12]++;
+                                if (e.notes[i].selected)
+                                    selkeys.push(e.notes[i].pitch);
                             }
                     cursor.next();
                 }
@@ -178,10 +183,11 @@ MuseScore {
             sum_r.push('-');
         else
             sum_r.sort();
-        qScaleLabel.text = sum_r.join(', ');
+        qScaleLabel.text = sum_r.join('  ');
 
         // Other determinations
         refreshFingering();
+        refreshHarmonization(selkeys);
     }
 
     function refreshFingering() {
@@ -261,6 +267,70 @@ MuseScore {
         qFingeringLabel.text = errmsg;
     }
 
+    function refreshHarmonization(selectedKeys) {
+        var selchords, possible;
+
+        function _key_repr(key, scale) {
+            var s = (curScore.keysig < 0 ? c_flatkeys_txt : c_keys_txt)[(key + 12) % 12] + scale;
+            if (selchords.indexOf(s) == -1)
+                selchords.push(s);
+        }
+
+        // Check
+        if (curScore == null) {
+            qHarmonizationSolutionLabel.text = '';
+            qHarmonizationAllLabel1.text = '';
+            qHarmonizationAllLabel2.text = '';
+            return false;
+        }
+        if (selectedKeys.length != 1)
+            return false;
+
+        // Find the chords
+        selchords = Array();
+        _key_repr(selectedKeys[0], '');             // Major
+        _key_repr(selectedKeys[0]-4, '');
+        _key_repr(selectedKeys[0]-7, '');
+        _key_repr(selectedKeys[0]-10, '');
+        _key_repr(selectedKeys[0], 'm');            // Minor
+        _key_repr(selectedKeys[0]-3, 'm');
+        _key_repr(selectedKeys[0]-7, 'm');
+        _key_repr(selectedKeys[0], '7');            // Seventh dominant
+        _key_repr(selectedKeys[0]-4, '7');
+        _key_repr(selectedKeys[0]-7, '7');
+        _key_repr(selectedKeys[0]-10, '7');
+        _key_repr(selectedKeys[0], 'dim');          // Diminished
+        _key_repr(selectedKeys[0]-3, 'dim');
+        _key_repr(selectedKeys[0]-6, 'dim');
+
+        // Key signature
+        switch (curScore.keysig) {
+            case -7: possible = Array('B',  'Dbm', 'Ebm', 'E',  'Gb', 'Abm', 'Bbdim'); break;  // Cb Ab
+            case -6: possible = Array('Gb', 'Abm', 'Bbm', 'B',  'Db', 'Ebm', 'Fdim');  break;  // Gb Eb
+            case -5: possible = Array('Db', 'Ebm', 'Fm',  'Gb', 'Ab', 'Bbm', 'Cdim');  break;  // Db Bb
+            case -4: possible = Array('Ab', 'Bbm', 'Cm',  'Db', 'Eb', 'Fm',  'Gdim');  break;  // Ab F
+            case -3: possible = Array('Eb', 'Fm',  'Gm',  'Ab', 'Bb', 'Cm',  'Ddim');  break;  // Eb C
+            case -2: possible = Array('Bb', 'Cm',  'Dm',  'Eb', 'F',  'Gm',  'Adim');  break;  // Bb G
+            case -1: possible = Array('F',  'Gm',  'Am',  'Bb', 'C',  'Dm',  'Edim');  break;  // F  D
+            case  0: possible = Array('C',  'Dm',  'Em',  'F',  'G',  'Am',  'Bdim');  break;  // C  A
+            case  1: possible = Array('G',  'Am',  'Bm',  'C',  'D',  'Em',  'F♯dim'); break;  // G  E
+            case  2: possible = Array('D',  'Em',  'F♯m', 'G',  'A',  'Bm',  'C♯dim'); break;  // D  B
+            case  3: possible = Array('A',  'Bm',  'C♯m', 'D',  'E',  'F♯m', 'G♯dim'); break;  // A  F♯
+            case  4: possible = Array('E',  'F♯m', 'G♯m', 'A',  'B',  'C♯m', 'D♯dim'); break;  // E  C♯
+            case  5: possible = Array('B',  'C♯m', 'D♯m', 'E',  'F♯', 'G♯m', 'A♯dim'); break;  // B  G♯
+            case  6: possible = Array('F♯', 'G♯m', 'A♯m', 'B',  'C♯', 'D♯m', 'Fdim');  break;  // F♯ D♯
+            case  7: possible = Array('C♯', 'D♯m', 'Fm',  'F♯', 'G♯', 'A♯m', 'Cdim');  break;  // C♯ A♯
+            default: return false;
+        }
+
+        // Result
+        qHarmonizationSolutionLabel.text = possible.filter(function(e) { return selchords.indexOf(e) != -1 }).join('  ');
+        selchords.sort();
+        qHarmonizationAllLabel1.text = selchords.slice(0, 7).join('  ');
+        qHarmonizationAllLabel2.text = selchords.slice(7).join('  ');
+        return true;
+    }
+
 
     //=============================================================================
     // QT elements
@@ -303,6 +373,8 @@ MuseScore {
             onClicked: refreshAccordion(qLayout.currentIndex)
         }
 
+        // ---
+
         Label {
             x: 10
             y: 70
@@ -316,9 +388,11 @@ MuseScore {
             y: 70
         }
 
+        // ---
+
         Label {
             x: 10
-            y: 560
+            y: 570
             text: "Fingering:"
             font.bold: true
         }
@@ -326,19 +400,55 @@ MuseScore {
         Label {
             id: qFingeringLabel
             x: 70
-            y: 560
+            y: 570
         }
 
         CheckBox {
             id: qFingeringRedundantCheckbox
             x: 10
-            y: 580
+            y: 590
             text: "Allowed redundancies"
         }
 
+        // ---
+
+        Label {
+            x: 10
+            y: 630
+            text: "Harmonization:"
+            font.bold: true
+        }
+
+        Label {
+            id: qHarmonizationSolutionLabel
+            x: 105
+            y: 630
+        }
+
+        Label {
+            x: 10
+            y: 650
+            text: "- All:"
+            font.bold: true
+        }
+
+        Label {
+            id: qHarmonizationAllLabel1
+            x: 45
+            y: 650
+        }
+
+        Label {
+            id: qHarmonizationAllLabel2
+            x: 45
+            y: 670
+        }
+
+        // ---
+
         Timer {
             id: qTimer
-            interval: 5000
+            interval: 3000
             running: true
             repeat: true
             onTriggered: refreshAccordion(qLayout.currentIndex)
