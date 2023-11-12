@@ -11,6 +11,7 @@
 // https://musescore.github.io/MuseScore_PluginAPI_Docs/plugins/html/namespace_ms.html#a16b11be27a8e9362dd122c4d879e01ae
 // https://musescore.github.io/MuseScore_PluginAPI_Docs/plugins/html/class_ms_1_1_plugin_a_p_i_1_1_element.html
 // https://musescore.github.io/MuseScore_PluginAPI_Docs/plugins/html/class_ms_1_1_plugin_a_p_i_1_1_plugin_a_p_i.html
+// https://musescore.org/en/node/320499
 // https://doc.qt.io/archives/qt-5.9/qmltypes.html
 // https://static.roland.com/assets/media/pdf/FR-1x_e02_W.pdf
 //=============================================================================
@@ -24,8 +25,8 @@ MuseScore {
     //=============================================================================
     // Meta info
 
-    version: "0.2.4"
-    description: "Musical tool for your chromatic button accordion: 6 layouts, fingering, chords and harmonization"
+    version: "0.2.5"
+    description: "Musical tool for your chromatic button accordion: layout, fingering, chords and harmonization"
     menuPath: "Plugins.ChromaticButtonAccordionRight"
     requiresScore: true
 
@@ -41,6 +42,7 @@ MuseScore {
     property var button_spacing: 5
     property var buttons: []
 
+    property var c_division: division
     property var c_keys_txt: Array('C', 'C♯', 'D', 'D♯', 'E', 'F', 'F♯', 'G', 'G♯', 'A', 'A♯', 'B')
     property var c_flatkeys_txt: Array('C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B')  // "♭" takes more space than "b"
     property var c_black: Array(false, true, false, true, false, false, true, false, true, false, true, false)
@@ -86,6 +88,32 @@ MuseScore {
         return c_keys_txt[key % 12] + (Math.floor(key / 12) - 1);
     }
 
+    function reduceChordNotation(chord) {
+        var prev;
+        do {
+            prev = chord;
+            chord = chord.replace('#', '♯').replace('♭', 'b')
+                         .replace('minor', 'm').replace('Minor', 'm').replace('MINOR', 'm')
+                         .replace('min', 'm').replace('Min', 'm').replace('MIN', 'm')
+                         .replace('major', 'M').replace('Major', 'M').replace('MAJOR', 'M')
+                         .replace('maj', 'M').replace('Maj', 'M').replace('MAJ', 'M')
+                         //.replace('ma', 'M').replace('Ma', 'M').replace('MA', 'M')
+                         .replace('^', 'M') // Δ
+                         .replace('Do', 'C').replace('do', 'C')
+                         .replace('Re', 'D').replace('re', 'D')
+                         .replace('Mi', 'E').replace('mi', 'E')
+                         .replace('Fa', 'F').replace('fa', 'F')
+                         .replace('Sol', 'G').replace('sol', 'G')
+                         .replace('La', 'A').replace('la', 'A')
+                         .replace('Si', 'B').replace('si', 'B')
+                         .replace('(', '').replace(')', '')
+                         .replace('Cb', 'B').replace('B#', 'C')
+                         .replace('E#', 'F').replace('Fb', 'E')
+                         .replace('.', '');
+        } while (chord != prev);
+        return chord;
+    }
+
     function refreshAccordion(id) {
         var // Types of accordions
             accordion_c_europe  = Array(null, null, null, 48, 49, null, 49, 50, 51, 52, 51, 52, 53, 54, 55, 54, 55, 56, 57, 58, 57, 58, 59, 60, 61, 60, 61, 62, 63, 64, 63, 64, 65, 66, 67, 66, 67, 68, 69, 70, 69, 70, 71, 72, 73, 72, 73, 74, 75, 76, 75, 76, 77, 78, 79, 78, 79, 80, 81, 82, 81, 82, 83, 84, 85, 84, 85, 86, 87, 88, 87, 88, 89, 90, 91, 90, 91, 92, 93, 94, 93, 94, 95, 96, 97, 96, 97, 98, 99, null, 99, 100, null, null, null),
@@ -107,7 +135,7 @@ MuseScore {
             sum, sum_max, sum_r;
 
         // Count the notes
-        midi = Array();
+        midi = [];
         for (i=0; i<128; i++)
             midi.push(0);
         midi_oct = Array(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
@@ -160,14 +188,14 @@ MuseScore {
 
         // Detection of the nearest scale
         sum_max = 0;
-        sum_r = Array();
+        sum_r = [];
         for (y=0; y<scales.length; y++) {                           // Scale
             for (x=0; x<12; x++) {                                  // Key
                 sum = 0;
                 for (i=0; i<scales[y].length; i++)
                     sum += midi_oct[(x + scales[y][i]) % 12];
                 if (sum > sum_max)
-                    sum_r = Array();
+                    sum_r = [];
                 if ((sum > 0) && (sum >= sum_max)) {
                     sum_max = sum;
                     sum_r.push(c_keys_txt[x] + scales_txt[y]);
@@ -188,12 +216,13 @@ MuseScore {
 
     function refreshFingering() {
         var cursor, e, e2, i, n, f, p,
-            keys, fingers, errmsg,
+            keys, fingers, ticks, errmsg,
             hand;
 
         // Map the keys and fingers
-        keys = Array();
-        fingers = Array();
+        keys = [];
+        fingers = [];
+        ticks = [];
         errmsg = '';
         if (curScore != null) {
             cursor = curScore.newCursor();
@@ -210,6 +239,7 @@ MuseScore {
                         }
                         e2 = e.notes[0];
                         keys.push(e2.pitch);
+                        ticks.push(Math.floor(cursor.tick / (4 * c_division)) + 1);
 
                         // Finger
                         n = 0;
@@ -243,14 +273,14 @@ MuseScore {
                 p = hand.indexOf(keys[i]);
                 if (fingers[i] != 0) {                                                  // With finger mark
                     if (!qFingeringRedundantCheckbox.checked && (p != -1) && (p == fingers[i])) {
-                        errmsg = 'redundant finger for '+key2us(keys[i])+' (note #'+(i+1)+')';
+                        errmsg = 'redundant finger for '+key2us(keys[i])+' on segment '+ticks[i];
                         break;
                     }
-                    hand.forEach(function(e) { return e == keys[i] ? -1 : e });         // Release key
+                    hand = hand.map(function(e) { return (e == keys[i] ? -1 : e) });    // Release key
                     hand[fingers[i]] = keys[i];                                         // Press key
                 } else {                                                                // Without finger mark
                     if (p == -1) {
-                        errmsg = 'missing finger for '+key2us(keys[i])+' (note #'+(i+1)+')';
+                        errmsg = 'missing finger for '+key2us(keys[i])+' on segment '+ticks[i];
                         break;
                     }
                 }
@@ -266,29 +296,6 @@ MuseScore {
     function refreshComplexChords() {
         var e, base, key, chord, tmp, result, case1, case2, case3;
 
-        function _reduceChordNotation(chord) {
-            var prev;
-            do {
-                prev = chord;
-                chord = chord.replace('#', '♯').replace('♭', 'b')
-                             .replace('minor', 'm').replace('Minor', 'm').replace('MINOR', 'm')
-                             .replace('min', 'm').replace('Min', 'm').replace('MIN', 'm')
-                             .replace('major', 'M').replace('Major', 'M').replace('MAJOR', 'M')
-                             .replace('maj', 'M').replace('Maj', 'M').replace('MAJ', 'M')
-                             //.replace('ma', 'M').replace('Ma', 'M').replace('MA', 'M')
-                             .replace('^', 'M') // Δ
-                             .replace('Do', 'C').replace('do', 'C')
-                             .replace('Re', 'D').replace('re', 'D')
-                             .replace('Mi', 'E').replace('mi', 'E')
-                             .replace('Fa', 'F').replace('fa', 'F')
-                             .replace('Sol', 'G').replace('sol', 'G')
-                             .replace('La', 'A').replace('la', 'A')
-                             .replace('Si', 'B').replace('si', 'B')
-                             .replace('(', '').replace(')', '');
-            } while (chord != prev);
-            return chord;
-        }
-
         function _key2str(key, single) {
             var result = (curScore.keysig < 0 ? c_flatkeys_txt : c_keys_txt)[key % 12];
             return (single ? result.toLowerCase() : result);
@@ -299,10 +306,10 @@ MuseScore {
         if ((curScore != null) && (curScore.selection.elements.length == 1)) {
             e = curScore.selection.elements[0];
             if (e.type == Element.HARMONY) {
-                tmp = _reduceChordNotation(e.text);
-                base = tmp.substr(0,1);
+                tmp = reduceChordNotation(e.text);
+                base = tmp.substr(0, 1);
                 chord = tmp.substr(1);
-                tmp = chord.substr(0,1);
+                tmp = chord.substr(0, 1);
                 if ((tmp == '♯') || (tmp == 'b')) {
                     base += tmp;
                     chord = chord.substr(1);
@@ -478,6 +485,40 @@ MuseScore {
             }
         }
         qComplexChordLabel.text = result;
+        refreshChordsOnScore();
+    }
+
+    function refreshChordsOnScore() {
+        var cursor, i, e, txt, p,
+            chords = [];
+        
+        if ((curScore == null) || (qComplexChordLabel.text.length > 0))
+            return false;
+
+        // Read all the available chords
+        cursor = curScore.newCursor();
+        cursor.staffIdx = 0;
+        cursor.voice = 0;
+        cursor.rewind(Cursor.SCORE_START);
+        while (cursor.segment) {
+            e = cursor.segment.annotations;
+            for (i=0; i<e.length ; i++) {
+                if (e[i].type == Element.HARMONY) {
+                    txt = reduceChordNotation(e[i].text);
+                    p = txt.indexOf('/');
+                    if (p != -1)
+                        txt = txt.substr(0, p);
+                    if ((chords.indexOf(txt) == -1) && (txt.toUpperCase() != 'NC'))
+                        chords.push(txt);
+                }
+            }
+            cursor.next();
+        }
+
+        // Show the chords
+        chords.sort();
+        qComplexChordLabel.text = (chords.length == 0 ? 'No harmony' : chords.join(' '));
+        return true;
     }
 
     function refreshHarmonization(selectedKeys) {
@@ -501,7 +542,7 @@ MuseScore {
 
         // Find the chords
         key = curScore.selection.elements[0].pitch;
-        selchords = Array();
+        selchords = [];
         _key_repr(key, '');             // Major
         _key_repr(key-4, '');
         _key_repr(key-7, '');
@@ -629,7 +670,7 @@ MuseScore {
         Label {
             x: 10
             y: 625
-            text: "Complex chord:"
+            text: "Detailed chords:"
             font.bold: true
         }
 
