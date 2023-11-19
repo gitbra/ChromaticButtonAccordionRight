@@ -11,7 +11,9 @@
 // https://musescore.github.io/MuseScore_PluginAPI_Docs/plugins/html/namespace_ms.html#a16b11be27a8e9362dd122c4d879e01ae
 // https://musescore.github.io/MuseScore_PluginAPI_Docs/plugins/html/class_ms_1_1_plugin_a_p_i_1_1_element.html
 // https://musescore.github.io/MuseScore_PluginAPI_Docs/plugins/html/class_ms_1_1_plugin_a_p_i_1_1_plugin_a_p_i.html
-// https://musescore.org/en/node/320499
+// Examples: https://musescore.org/en/node/320673
+// Debugger: https://musescore.org/en/node/320499
+// MuseScore 4: https://musescore.org/en/node/337468
 // https://doc.qt.io/archives/qt-5.9/qmltypes.html
 // https://static.roland.com/assets/media/pdf/FR-1x_e02_W.pdf
 //=============================================================================
@@ -25,24 +27,23 @@ MuseScore {
     //=============================================================================
     // Meta info
 
-    version: "0.2.5"
+    version: "0.3"
     description: "Musical tool for your chromatic button accordion: layout, fingering, chords and harmonization"
     menuPath: "Plugins.ChromaticButtonAccordionRight"
     requiresScore: true
 
     id: mainapp
-    pluginType: "dock"
+    pluginType: "dialog"                    // Replace by "dock" in MuseScore 3
     dockArea: "right"
-    width: 260
-    height: 750
+    width: 280
+    height: 780
 
-    property var rotate: false                // Manual set only
+    property var rotate: false              // Manual set only
     property var button_width: 30
     property var button_height: 20
     property var button_spacing: 5
     property var buttons: []
 
-    property var c_division: division
     property var c_keys_txt: Array('C', 'C♯', 'D', 'D♯', 'E', 'F', 'F♯', 'G', 'G♯', 'A', 'A♯', 'B')
     property var c_flatkeys_txt: Array('C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B')  // "♭" takes more space than "b"
     property var c_black: Array(false, true, false, true, false, false, true, false, true, false, true, false)
@@ -59,7 +60,7 @@ MuseScore {
     onRun: {
         // Check
         if (typeof curScore === 'undefined')
-            Qt.quit();
+            return;
 
         // Basic layout
         var x, y, pos, but, pivot;
@@ -78,6 +79,14 @@ MuseScore {
             }
         }
         refreshAccordion(qLayout.currentIndex);
+    }
+
+    Component.onCompleted: {
+        if (mscoreMajorVersion >= 4) {
+            title = 'Chromatic button accordion'
+            // thumbnailName = 'none.png'
+            categoryCode = "Notes & Rest"
+        }
     }
 
 
@@ -107,11 +116,20 @@ MuseScore {
                          .replace('La', 'A').replace('la', 'A')
                          .replace('Si', 'B').replace('si', 'B')
                          .replace('(', '').replace(')', '')
-                         .replace('Cb', 'B').replace('B#', 'C')
-                         .replace('E#', 'F').replace('Fb', 'E')
+                         .replace('Cb', 'B').replace('B♯', 'C')
+                         .replace('E♯', 'F').replace('Fb', 'E')
                          .replace('.', '');
         } while (chord != prev);
         return chord;
+    }
+
+    function getScope() {
+        return [(curScore.selection.isRange ? curScore.selection.startSegment.tick : curScore.firstMeasure.firstSegment.tick),
+                (curScore.selection.isRange && curScore.selection.endSegment ? curScore.selection.endSegment.tick : curScore.lastSegment.tick)];
+    }
+
+    function inScope(cursor, scope) {
+        return (cursor == null ? false : ((scope[0] <= cursor.tick) && (cursor.tick < scope[1])));
     }
 
     function refreshAccordion(id) {
@@ -131,7 +149,7 @@ MuseScore {
 
         var e, i, x, y,
             but, key, black,
-            midi, midi_oct, cursor, voice,
+            midi, midi_oct, cursor, voice, scope,
             sum, sum_max, sum_r;
 
         // Count the notes
@@ -140,15 +158,18 @@ MuseScore {
             midi.push(0);
         midi_oct = Array(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
         if (curScore != null) {
+            scope = getScope();
             cursor = curScore.newCursor();
             cursor.staffIdx = 0;
             for (voice=0; voice<4; voice++) {
                 cursor.voice = voice;
                 cursor.rewind(Cursor.SCORE_START);
                 while (cursor.segment) {
-                    if (e = cursor.element)
+                    if (inScope(cursor, scope) && (e = cursor.element))
                         if (e.type == Element.CHORD)
                             for (i=0; i<e.notes.length; i++) {
+                                if (e.notes[i].tieBack)            // Long note
+                                    continue;
                                 midi[e.notes[i].pitch]++;
                                 midi_oct[e.notes[i].pitch % 12]++;
                             }
@@ -215,7 +236,7 @@ MuseScore {
     }
 
     function refreshFingering() {
-        var cursor, e, e2, i, n, f, p,
+        var cursor, scope, timesigFactor, e, e2, i, n, f, p,
             keys, fingers, ticks, errmsg,
             hand;
 
@@ -225,21 +246,23 @@ MuseScore {
         ticks = [];
         errmsg = '';
         if (curScore != null) {
+            scope = getScope();
             cursor = curScore.newCursor();
             cursor.staffIdx = 0;
             cursor.voice = 0;
             cursor.rewind(Cursor.SCORE_START);
+            timesigFactor = cursor.measure.timesigActual.numerator / cursor.measure.timesigActual.denominator;
             while (cursor.segment) {
-                if (e = cursor.element) {
+                if (inScope(cursor, scope) && (e = cursor.element))
                     if (e.type == Element.CHORD) {
                         // Key
                         if (e.notes.length != 1) {
-                            errmsg = 'chords are not supported';
+                            errmsg = 'Chords are not supported';
                             break;
                         }
                         e2 = e.notes[0];
                         keys.push(e2.pitch);
-                        ticks.push(Math.floor(cursor.tick / (4 * c_division)) + 1);
+                        ticks.push(Math.floor(cursor.tick / (4 * timesigFactor * division)) + 1);
 
                         // Finger
                         n = 0;
@@ -247,7 +270,7 @@ MuseScore {
                             if (e2.elements[i].type == Element.FINGERING) {
                                 f = parseInt(e2.elements[i].text.substring(0, 1));
                                 if (isNaN(f) || (f < 1) || (f > 5))
-                                    errmsg = 'wrong finger identifier';
+                                    errmsg = 'Wrong finger identifier';
                                 else
                                     n++;
                             }
@@ -257,11 +280,10 @@ MuseScore {
                         else if (n == 1)
                             fingers.push(f);
                         else
-                            errmsg = 'multiple fingering for a key';
+                            errmsg = 'Multiple fingering for a key';
+                        if (errmsg.length > 0)
+                            break;
                     }
-                }
-                if (errmsg.length > 0)
-                    break;
                 cursor.next();
             }
         }
@@ -273,14 +295,14 @@ MuseScore {
                 p = hand.indexOf(keys[i]);
                 if (fingers[i] != 0) {                                                  // With finger mark
                     if (!qFingeringRedundantCheckbox.checked && (p != -1) && (p == fingers[i])) {
-                        errmsg = 'redundant finger for '+key2us(keys[i])+' on segment '+ticks[i];
+                        errmsg = 'Redundant finger for '+key2us(keys[i])+' on segment '+ticks[i];
                         break;
                     }
                     hand = hand.map(function(e) { return (e == keys[i] ? -1 : e) });    // Release key
                     hand[fingers[i]] = keys[i];                                         // Press key
                 } else {                                                                // Without finger mark
                     if (p == -1) {
-                        errmsg = 'missing finger for '+key2us(keys[i])+' on segment '+ticks[i];
+                        errmsg = 'Missing finger for '+key2us(keys[i])+' on segment '+ticks[i];
                         break;
                     }
                 }
@@ -289,7 +311,7 @@ MuseScore {
 
         // Final analysis
         if (errmsg == '')
-            errmsg = 'no error found';
+            errmsg = 'No error found';
         qFingeringLabel.text = errmsg;
     }
 
@@ -489,27 +511,30 @@ MuseScore {
     }
 
     function refreshChordsOnScore() {
-        var cursor, i, e, txt, p,
+        var cursor, scope, i, e, txt, p,
             chords = [];
         
         if ((curScore == null) || (qComplexChordLabel.text.length > 0))
             return false;
 
         // Read all the available chords
+        scope = getScope();
         cursor = curScore.newCursor();
         cursor.staffIdx = 0;
         cursor.voice = 0;
         cursor.rewind(Cursor.SCORE_START);
         while (cursor.segment) {
-            e = cursor.segment.annotations;
-            for (i=0; i<e.length ; i++) {
-                if (e[i].type == Element.HARMONY) {
-                    txt = reduceChordNotation(e[i].text);
-                    p = txt.indexOf('/');
-                    if (p != -1)
-                        txt = txt.substr(0, p);
-                    if ((chords.indexOf(txt) == -1) && (txt.toUpperCase() != 'NC'))
-                        chords.push(txt);
+            if (inScope(cursor, scope)) {
+                e = cursor.segment.annotations;
+                for (i=0; i<e.length ; i++) {
+                    if (e[i].type == Element.HARMONY) {
+                        txt = reduceChordNotation(e[i].text);
+                        p = txt.indexOf('/');
+                        if (p != -1)
+                            txt = txt.substr(0, p);
+                        if ((chords.indexOf(txt) == -1) && (txt.toUpperCase() != 'NC'))
+                            chords.push(txt);
+                    }
                 }
             }
             cursor.next();
@@ -603,7 +628,7 @@ MuseScore {
 
         ComboBox {
             id: qLayout
-            x: 60
+            x: 70
             y: 10
             width: 120
 
@@ -633,13 +658,13 @@ MuseScore {
         Label {
             x: 10
             y: 530
-            text: "Possible scales:"
+            text: "Scales:"
             font.bold: true
         }
 
         Label {
             id: qScaleLabel
-            x: 100
+            x: 70
             y: 530
         }
 
@@ -654,14 +679,14 @@ MuseScore {
 
         Label {
             id: qFingeringLabel
-            x: 70
-            y: 565
+            x: 10
+            y: 585
         }
 
         CheckBox {
             id: qFingeringRedundantCheckbox
             x: 10
-            y: 585
+            y: 605
             text: "Allowed redundancies"
         }
 
@@ -669,7 +694,7 @@ MuseScore {
 
         Label {
             x: 10
-            y: 625
+            y: 645
             text: "Detailed chords:"
             font.bold: true
         }
@@ -677,41 +702,41 @@ MuseScore {
         Label {
             id: qComplexChordLabel
             x: 10
-            y: 645
+            y: 665
         }
 
         // ---
 
         Label {
             x: 10
-            y: 680
+            y: 700
             text: "Harmonization:"
             font.bold: true
         }
 
         Label {
             id: qHarmonizationSolutionLabel
-            x: 105
-            y: 680
+            x: 130
+            y: 700
         }
 
         Label {
             x: 10
-            y: 700
+            y: 720
             text: "- All:"
             font.bold: true
         }
 
         Label {
             id: qHarmonizationAllLabel1
-            x: 45
-            y: 700
+            x: 50
+            y: 720
         }
 
         Label {
             id: qHarmonizationAllLabel2
-            x: 45
-            y: 720
+            x: 50
+            y: 740
         }
 
         // ---

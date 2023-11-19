@@ -1,7 +1,5 @@
 # Tools for your chromatic button accordion in MuseScore
 
-*(Tested in MuseScore 3.6.2)*
-
 I am learning the chromatic button accordion and use MuseScore a lot to prepare my music. I needed an assistant to:
 
 - see at glance which buttons the right hand should press for a track,
@@ -32,19 +30,16 @@ The accordion refreshes itself every 3 seconds.
 
 ### General
 
-- Not tested under MuseScore 4
 - The score in the screenshot is the typical supported format
 
 ### Usage of the buttons
 
 The feature counts the notes and highlights them with 6 possible layouts.
 
-- Edit the plugin with a text editor manually to rotate the accordion by default (`rotate: true`)
+- To rotate the accordion by default, or dock the plugin (MS3), edit the plugin with a text editor
 - First track only
-- Selections not supported
 - 8va/8vb not supported
 - Grace notes not supported
-- Long notes are several notes
 
 ### Possible scales
 
@@ -60,9 +55,10 @@ The feature verifies if each note is assigned to a finger. It is very useful at 
 
 - First track only
 - First voice only
-- Selections not supported
+- Multiple time signatures not supported
 - Chords not supported
 - First finger only not supported
+- Grace notes not supported
 - No physical validation of the hand movement
 - No musical validation of the order of the fingering
 
