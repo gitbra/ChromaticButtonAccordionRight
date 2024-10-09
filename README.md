@@ -3,6 +3,7 @@
 I am learning the chromatic button accordion and use MuseScore a lot to prepare my music. I needed an assistant to:
 
 - see at glance which buttons the right hand should press for a track,
+- detect the suitable key signature,
 - check the fingering in the annotations,
 - expand the chords to make them playable with the Stradella bass system,
 - find some suitable chords within a defined scale.
@@ -66,10 +67,7 @@ The feature verifies if each note is assigned to a finger. It is very useful at 
 
 The feature is dedicated to the Stradella bass system to split a complex chord into simple chords.
 
-- Chords combinations displayed in descending order of accuracy
-- Single chords and notes displayed in ascending order of pitch
-- Some chords are simplified and partially transposed
-- Some chords require a diminished chord on your accordion
+Main assumption : C7 equals `E + G + Bb` and `C♯dim7`.
 
 ### Harmonization
 

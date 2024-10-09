@@ -1,6 +1,6 @@
 //=============================================================================
 // Chromatic button accordion, right hand - Plugin for MuseScore
-// Copyright © 2023 Alexandre Bréard
+// Copyright © 2023-2024 Alexandre Bréard
 // Homepage: https://github.com/gitbra/ChromaticButtonAccordionRight
 // License: https://www.gnu.org/licenses/gpl-3.0.en.html
 //=============================================================================
@@ -27,9 +27,10 @@ MuseScore {
     //=============================================================================
     // Meta info
 
-    version: "0.3"
+    version: "0.3.1"
     description: "Musical tool for your chromatic button accordion: layout, fingering, chords and harmonization"
-    menuPath: "Plugins.ChromaticButtonAccordionRight"
+    menuPath: "Plugins." + pluginName
+    readonly property var pluginName: "Chromatic button accordion"
     requiresScore: true
 
     id: mainapp
@@ -38,15 +39,15 @@ MuseScore {
     width: 280
     height: 780
 
-    property var rotate: false              // Manual set only
-    property var button_width: 30
-    property var button_height: 20
-    property var button_spacing: 5
+    readonly property var rotate: false         // Manual set only
+    readonly property var button_width: 30
+    readonly property var button_height: 20
+    readonly property var button_spacing: 5
     property var buttons: []
 
-    property var c_keys_txt: Array('C', 'C♯', 'D', 'D♯', 'E', 'F', 'F♯', 'G', 'G♯', 'A', 'A♯', 'B')
-    property var c_flatkeys_txt: Array('C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B')  // "♭" takes more space than "b"
-    property var c_black: Array(false, true, false, true, false, false, true, false, true, false, true, false)
+    readonly property var c_keys_txt: Array('C', 'C♯', 'D', 'D♯', 'E', 'F', 'F♯', 'G', 'G♯', 'A', 'A♯', 'B')
+    readonly property var c_flatkeys_txt: Array('C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B')  // "♭" takes more space than "b"
+    readonly property var c_black: Array(false, true, false, true, false, false, true, false, true, false, true, false)
 
 
     //=============================================================================
@@ -83,7 +84,7 @@ MuseScore {
 
     Component.onCompleted: {
         if (mscoreMajorVersion >= 4) {
-            title = 'Chromatic button accordion'
+            title = pluginName
             // thumbnailName = 'none.png'
             categoryCode = "Notes & Rest"
         }
@@ -102,12 +103,14 @@ MuseScore {
         do {
             prev = chord;
             chord = chord.replace('#', '♯').replace('♭', 'b')
+                         .replace('th', '').replace('/', '').replace('(', '').replace(')', '')
                          .replace('minor', 'm').replace('Minor', 'm').replace('MINOR', 'm')
                          .replace('min', 'm').replace('Min', 'm').replace('MIN', 'm')
                          .replace('major', 'M').replace('Major', 'M').replace('MAJOR', 'M')
                          .replace('maj', 'M').replace('Maj', 'M').replace('MAJ', 'M')
                          //.replace('ma', 'M').replace('Ma', 'M').replace('MA', 'M')
-                         .replace('^', 'M') // Δ
+                         .replace('^', 'M7') // Δ
+                         .replace('0', 'm7b5') // ø
                          .replace('Do', 'C').replace('do', 'C')
                          .replace('Re', 'D').replace('re', 'D')
                          .replace('Mi', 'E').replace('mi', 'E')
@@ -115,7 +118,6 @@ MuseScore {
                          .replace('Sol', 'G').replace('sol', 'G')
                          .replace('La', 'A').replace('la', 'A')
                          .replace('Si', 'B').replace('si', 'B')
-                         .replace('(', '').replace(')', '')
                          .replace('Cb', 'B').replace('B♯', 'C')
                          .replace('E♯', 'F').replace('Fb', 'E')
                          .replace('.', '');
@@ -316,11 +318,11 @@ MuseScore {
     }
 
     function refreshComplexChords() {
-        var e, base, key, chord, tmp, result, case1, case2, case3;
+        var e, i, base, key, chord, tmp, result, parts;
 
-        function _key2str(key, single) {
-            var result = (curScore.keysig < 0 ? c_flatkeys_txt : c_keys_txt)[key % 12];
-            return (single ? result.toLowerCase() : result);
+        function _key2str(key, chord) {
+            var result = (curScore.keysig < 0 ? c_flatkeys_txt : c_keys_txt)[(key + 12) % 12];
+            return (chord == '' ? result.toLowerCase() : result + chord.replace('M', ''));
         }
 
         // Detect the chord
@@ -345,164 +347,175 @@ MuseScore {
                         chord = chord.substr(0, tmp);
 
                     // Expand the chord
-                    case1 = ['no information'];
-                    case2 = [];
-                    case3 = [];
+                    parts = [['no information']];
                     switch (chord) {
                         case 'dim': // 0 3 6
-                            case1 = ['standard chord'];
+                        case 'mb5':
+                            parts = [[_key2str(key-4, '7')],
+                                     [_key2str(key-3, 'dim')]];
                             break;
 
                         case 'dim7': // 0 3 6 9
-                            case1 = [_key2str(key, true), _key2str(key+6, false)+'dim'];        // Second note transposed from dim7
-                            case2 = [_key2str(key+6, true), _key2str(key, false)+'dim'];        // Third note as bass
+                        case '7dim':
+                            parts = [[_key2str(key-4, '7'), _key2str(key+5, '7')],
+                                     [_key2str(key-4, '7'), _key2str(key-1, '7')],
+                                     [_key2str(key-3, 'dim'), _key2str(key, 'dim')]];
                             break;
 
                         case 'm7b5': // 0 3 6 10
-                            case1 = [_key2str(key, true), _key2str(key+3, false)+'m'];
+                            parts = [[_key2str(key+3, 'm'), _key2str(key-4, '7')],
+                                     [_key2str(key+3, 'm'), _key2str(key-3, 'dim')]];
                             break;
 
                         case 'm': // 0 3 7
-                            case1 = ['standard chord'];
+                            parts = [['standard chord']];
                             break;
 
                         case 'm6': // 0 3 7 9
-                            case1 = [_key2str(key, false)+'m', _key2str(key+9, true)];          // Fourth note as bass
+                            parts = [[_key2str(key, 'm'), _key2str(key-7, '7')],
+                                     [_key2str(key, 'm'), _key2str(key-6, 'dim')]];
                             break;
 
                         case 'm7': // 0 3 7 10
-                            case1 = [_key2str(key, true), _key2str(key+3, false)];
-                            case2 = [_key2str(key, false)+'m', _key2str(key+3, false)];
+                            parts = [[_key2str(key, 'm'), _key2str(key+3, 'M')],
+                                     [_key2str(key, ''), _key2str(key+3, 'M')]];
                             break;
 
                         case 'm7b9': // 0 3 7 10 13
-                            case1 = [_key2str(key, false)+'m', _key2str(key+10, false)+'dim'];
+                            parts = [[_key2str(key, 'm'), _key2str(key+3, '7')],
+                                     [_key2str(key, 'm'), _key2str(key+4, 'dim')]];
                             break;
 
                         case 'm9': // 0 3 7 10 14
-                            case1 = [_key2str(key, false)+'m', _key2str(key+7, false)+'m'];
-                            case2 = [_key2str(key, true), _key2str(key+7, false)+'m'];          // With optional minor
+                        case 'm79':
+                            parts = [[_key2str(key, 'm'), _key2str(key+7, 'm')]];
                             break;
 
                         case 'm11': // 0 3 7 10 14 17
-                            case1 = [_key2str(key, false)+'m', _key2str(key+10, false)];
+                            parts = [[_key2str(key, 'm'), _key2str(key-2, 'M')]];
                             break;
 
-                        case 'mM9': // 0 3 7 11 14
-                        case 'm9M7':
-                            case1 = [_key2str(key, false)+'m', _key2str(key+7, false)];
-                            case2 = [_key2str(key, true), _key2str(key+7, false)];              // With optional minor
+                        case 'm13': // 0 3 7 10 14 21
+                            parts = [[_key2str(key+7, 'm'), _key2str(key-7, '7')],
+                                     [_key2str(key+7, 'm'), _key2str(key-6, 'dim')]];
                             break;
 
-                        case 'mM7add13': // 0 3 7 11 21
-                            case1 = [_key2str(key, false)+'m', _key2str(key+11, false)+'7'];    // Several transpositions
+                        case 'm7add13': // 0 3 7 10 21
+                            parts = [[_key2str(key+3, 'M'), _key2str(key-7, '7')],
+                                     [_key2str(key+3, 'M'), _key2str(key-6, 'dim')]];
                             break;
 
-                        case '7b5': // 0 4 6 10
-                            case1 = [_key2str(key, false)+'7', _key2str(key+6, false)+'7'];
-                            case2 = [_key2str(key, true), _key2str(key+6, false)+'7'];          // Second note transposed from 7
-                            case3 = [_key2str(key, false)+'7', _key2str(key+6, true)];
+                        case 'm9M7': // 0 3 7 11 14
+                            parts = [[_key2str(key, 'm'), _key2str(key+7, 'M')]];
                             break;
 
-                        case '7b5b9': // 0 4 6 10 13
-                            case1 = [_key2str(key, false)+'7', _key2str(key+6, false)];
+                        case 'mM11': // 0 3 7 11 14 17
+                            parts = [[_key2str(key, 'm'), _key2str(key+7, '7')],
+                                     [_key2str(key, 'm'), _key2str(key+8, 'dim')]];
+                            break;
+
+                        case 'mM13': // 0 3 7 11 14 21
+                            parts = [[_key2str(key+7, 'M'), _key2str(key-7, '7')],
+                                     [_key2str(key+7, 'M'), _key2str(key-6, 'dim')]];
                             break;
 
                         case '13b5b9': // 0 4 6 10 13 21
-                            case1 = [_key2str(key, false)+'7', _key2str(key+6, false)+'m'];     // Sixth note transposed from Minor
+                            parts = [[_key2str(key+6, 'M'), _key2str(key-3, 'm')]];
                             break;
 
                         case '': // 0 4 7
-                            case1 = ['standard chord'];
+                            parts = [['standard chord']];
                             break;
 
                         case '6': // 0 4 7 9
-                            case1 = [_key2str(key, false), _key2str(key+9, false)+'m'];
-                            case2 = [_key2str(key, true), _key2str(key+9, false)+'m'];          // Transposed without 5th
+                            parts = [[_key2str(key, 'M'), _key2str(key-3, 'm')]];
                             break;
 
                         case '7': // 0 4 7 10
-                            case1 = [_key2str(key, false), _key2str(key, false)+'7'];           // Third note from Major
-                            case2 = [_key2str(key, true), _key2str(key+7, false)+'dim'];        // Second note transposed from dim7
-                            case3 = [_key2str(key, false)+'7', _key2str(key+7, true)];          // Third note as bass
+                            parts = [[_key2str(key, 'M'), _key2str(key, '7')],
+                                     [_key2str(key, 'M'), _key2str(key+1, 'dim')]];
                             break;
 
                         case '7b9': // 0 4 7 10 13
-                            case1 = [_key2str(key, false), _key2str(key+10, false)+'dim'];
-                            case2 = [_key2str(key, true), _key2str(key+10, false)+'dim'];       // With optional major
-                            case3 = [_key2str(key, false)+'7', _key2str(key+4, false)+'dim'];
+                        case '9b':
+                            parts = [[_key2str(key, 'M'), _key2str(key+3, '7')],
+                                     [_key2str(key, 'M'), _key2str(key+4, 'dim')]];
                             break;
 
                         case '11b9': // 0 4 7 10 13 17
-                            case1 = [_key2str(key, false), _key2str(key+10, false)+'m'];
-                            case2 = [_key2str(key, true), _key2str(key+10, false)+'m'];         // With optional major
+                            parts = [[_key2str(key, 'M'), _key2str(key-2, 'm')]];
+                            break;
+
+                        case '13b9': // 0 4 7 10 13 21
+                            parts = [[_key2str(key-3, 'm'), _key2str(key+3, '7')],
+                                     [_key2str(key-3, 'm'), _key2str(key+4, 'dim')]];
                             break;
 
                         case '9': // 0 4 7 10 14
-                        case '7add9':
-                            case1 = [_key2str(key, false), _key2str(key+7, false)+'m'];
-                            case2 = [_key2str(key, false)+'7', _key2str(key+7, false)+'m'];
-                            case3 = [_key2str(key, true), _key2str(key+7, false)+'m'];          // With optional major
+                            parts = [[_key2str(key, 'M'), _key2str(key+7, 'm')]];
                             break;
 
                         case '11': // 0 4 7 10 14 17
-                        case '9b11':
-                            case1 = [_key2str(key, false), _key2str(key+10, false)];
-                            case2 = [_key2str(key, true), _key2str(key+10, false)];             // With optional major
+                            parts = [[_key2str(key, 'M'), _key2str(key-2, 'M')]];
                             break;
 
-                        case '9b13': // 0 4 7 10 14 20
-                            case1 = [_key2str(key, false), _key2str(key+10, false)+'7'];
-                            case2 = [_key2str(key, true), _key2str(key+10, false)+'7'];         // With optional major
+                        case '13': // 0 4 7 10 14 21
+                            parts = [[_key2str(key-3, 'm'), _key2str(key+7, 'm')]];
                             break;
 
                         case '7♯9': // 0 4 7 10 15
-                            case1 = [_key2str(key, false), _key2str(key+15, false)];            // Fourth note transposed from second Major
+                            parts = [[_key2str(key, 'M'), _key2str(key+3, 'M')]];
+                            break;
+
+                        case '13♯9': // 0 4 7 10 15 21
+                            parts = [[_key2str(key, '7'), _key2str(key+5, '7')],
+                                     [_key2str(key+1, 'dim'), _key2str(key+6, 'dim')]];
+                            break;
+
+                        case '7add13': // 0 4 7 10 21
+                            parts = [[_key2str(key-3, 'm'), _key2str(key, '7')],
+                                     [_key2str(key-3, 'm'), _key2str(key+1, 'dim')]];
                             break;
 
                         case 'M7': // 0 4 7 11
-                            case1 = [_key2str(key, false), _key2str(key+4, false)+'m'];
+                            parts = [[_key2str(key, 'M'), _key2str(key+4, 'm')]];
                             break;
 
                         case 'M9': // 0 4 7 11 14
-                            case1 = [_key2str(key, false), _key2str(key+7, false)];
-                            case2 = [_key2str(key, true), _key2str(key+7, false)];              // With optional major
-                            break;
-                            
-                        case 'M11': // 0 4 7 11 14 17
-                        case 'M9b11':
-                            case1 = [_key2str(key, false), _key2str(key+7, false), _key2str(key+7, false)+'7'];
-                            break;
-                            
-                        case 'M9♯11': // 0 4 7 11 14 18
-                            case1 = [_key2str(key, false), _key2str(key+11, false)+'m'];
-                            case2 = [_key2str(key, true), _key2str(key+11, false)+'m'];         // With optional major
+                        case 'M79':
+                            parts = [[_key2str(key, 'M'), _key2str(key+7, 'M')],
+                                     [_key2str(key+4, 'm'), _key2str(key+7, 'M')]];
                             break;
 
-                        case '7♯5': // 0 4 8 10
-                            case1 = [_key2str(key, false)+'7', _key2str(key+8, true)];          // Third note as bass
+                        case 'M11': // 0 4 7 11 14 17
+                            parts = [[_key2str(key, 'M'), _key2str(key+7, '7')],
+                                     [_key2str(key, 'M'), _key2str(key+8, 'dim')]];
+                            break;
+
+                        case 'M9♯11': // 0 4 7 11 14 18
+                            parts = [[_key2str(key, 'M'), _key2str(key-1, 'm')]];
+                            break;
+
+                        case 'M13': // 0 4 7 11 14 21
+                            parts = [[_key2str(key-3, 'm'), _key2str(key+7, 'M')]];
+                            break;
+
+                        case 'M7add13': // 0 4 7 11 21
+                            parts = [[_key2str(key-3, 'm'), _key2str(key+4, 'm')]];
                             break;
 
                         case 'M7♯5': // 0 4 8 11
-                            case1 = [_key2str(key, true), _key2str(key+4, false)];
-                            break;
-
-                        case 'M9♯5': // 0 4 8 11 14
-                            case1 = [_key2str(key, true), _key2str(key+4, false), _key2str(key+4, false)+'7'];
-                            break;
-
-                        case '9sus': // 0 5 (7) 10 14
-                        case '9sus4':
-                            case1 = [_key2str(key, true), _key2str(key+10, false)];             // Without 5th (impossible), second note transposed
+                            parts = [[_key2str(key, ''), _key2str(key+4, 'M')]];    // First note as bass
                             break;
                     }
 
                     // Format the result
-                    result = base + chord + ' = ' + (case1.join(' + '));
-                    if (case2.length > 0)
-                        result += ', ' + (case2.join(' + '));
-                    if (case3.length > 0)
-                        result += ', ' + (case3.join(' + '));
+                    result = base + chord + ' = ';
+                    for (i=0 ; i<parts.length ; i++) {
+                        if (i > 0)
+                            result += ', ';
+                        result += parts[i].join(' + ');
+                    }
                 }
             }
         }
@@ -513,7 +526,7 @@ MuseScore {
     function refreshChordsOnScore() {
         var cursor, scope, i, e, txt, p,
             chords = [];
-        
+
         if ((curScore == null) || (qComplexChordLabel.text.length > 0))
             return false;
 
@@ -579,9 +592,10 @@ MuseScore {
         _key_repr(key-4, '7');
         _key_repr(key-7, '7');
         _key_repr(key-10, '7');
-        _key_repr(key, 'dim');          // Diminished
+        _key_repr(key, 'dim');          // Diminished seventh
         _key_repr(key-3, 'dim');
         _key_repr(key-6, 'dim');
+        _key_repr(key-9, 'dim');
 
         // Key signature
         switch (curScore.keysig) {
