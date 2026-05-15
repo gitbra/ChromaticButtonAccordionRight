@@ -15,12 +15,20 @@ For what it's worth, here is the plugin for doing that! Enjoy.
 
 [![License: GPL v3](https://img.shields.io/badge/License-GPL%20v3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0.en.html)
 
-Download the QML file into the folder `C:\GoToFolderOf\MuseScore\plugins\`, then run MuseScore.
+By respecting the target version of your MuseScore, download the QML file into one of these folders:
 
-1. Work on your track
-2. Activate the plugin `ChromaticButtonAccordionRight` in the manager (if not done already)
+- Windows:
+	- `C:\FolderOf\MuseScore\Plugins\`
+	- `%USERPROFILE%\Documents\MuseScore3\Plugins\`
+	- `%USERPROFILE%\Documents\MuseScore4\Plugins\`
+- Linux:
+	- `~/Documents/MuseScore4/Plugins/`
+	- `~/.local/share/data/MuseScore/Plugins/`
+
+1. Run MuseScore
+2. Activate the plugin `ChromaticButtonAccordionRight` in the manager (Mu3) or from the home screen (Mu4)
 3. Call the plugin from the menu
-4. Look at the docked accordion
+4. Look at the appearing accordion
 
 ![](screenshot.png)
 
@@ -37,7 +45,7 @@ The accordion refreshes itself every 3 seconds.
 
 The feature counts the notes and highlights them with 6 possible layouts.
 
-- To rotate the accordion by default, or dock the plugin (MS3), edit the plugin with a text editor
+- To rotate the accordion by default, edit the plugin with a text editor
 - First track only
 - 8va/8vb not supported
 - Grace notes not supported

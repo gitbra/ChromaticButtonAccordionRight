@@ -1,6 +1,6 @@
 //=============================================================================
-// Chromatic button accordion, right hand - Plugin for MuseScore
-// Copyright © 2023-2024 Alexandre Bréard
+// Chromatic button accordion, right hand - Plugin for MuseScore 3.6.2
+// Copyright © 2023-2026 Alexandre Bréard
 // Homepage: https://github.com/gitbra/ChromaticButtonAccordionRight
 // License: https://www.gnu.org/licenses/gpl-3.0.en.html
 //=============================================================================
@@ -27,14 +27,14 @@ MuseScore {
     //=============================================================================
     // Meta info
 
-    version: "0.3.1"
+    version: "0.4.0"
     description: "Musical tool for your chromatic button accordion: layout, fingering, chords and harmonization"
-    menuPath: "Plugins." + pluginName
     readonly property var pluginName: "Chromatic button accordion"
+    menuPath: "Plugins." + pluginName
     requiresScore: true
 
     id: mainapp
-    pluginType: "dialog"                    // Replace by "dock" in MuseScore 3
+    pluginType: "dock"
     dockArea: "right"
     width: 280
     height: 780
@@ -83,10 +83,10 @@ MuseScore {
     }
 
     Component.onCompleted: {
-        if (mscoreMajorVersion >= 4) {
+        if ((mscoreMajorVersion >= 4) && (mscoreMinorVersion < 4)) {
             title = pluginName
             // thumbnailName = 'none.png'
-            categoryCode = "Notes & Rest"
+            categoryCode = "composing-arranging-tools"
         }
     }
 
@@ -102,14 +102,16 @@ MuseScore {
         var prev;
         do {
             prev = chord;
-            chord = chord.replace('#', '♯').replace('♭', 'b')
-                         .replace('th', '').replace('/', '').replace('(', '').replace(')', '')
-                         .replace('minor', 'm').replace('Minor', 'm').replace('MINOR', 'm')
+            chord = chord.split('/')[0]
+			             .replace('#', '♯').replace('♭', 'b')
+                         .replace('th', '').replace('(', '').replace(')', '')
+                         .replace('-', 'm').replace('minor', 'm').replace('Minor', 'm').replace('MINOR', 'm')
                          .replace('min', 'm').replace('Min', 'm').replace('MIN', 'm')
                          .replace('major', 'M').replace('Major', 'M').replace('MAJOR', 'M')
                          .replace('maj', 'M').replace('Maj', 'M').replace('MAJ', 'M')
                          //.replace('ma', 'M').replace('Ma', 'M').replace('MA', 'M')
-                         .replace('^', 'M7') // Δ
+                         .replace('^7', 'M7').replace('^', 'M7')   // Δ
+                         .replace('°', 'dim')
                          .replace('0', 'm7b5') // ø
                          .replace('Do', 'C').replace('do', 'C')
                          .replace('Re', 'D').replace('re', 'D')
